@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Maeumsee",
+    "slug": "maeumsee",
+    "scheme": "maeumsee",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-router"
+    ],
+    "android": {
+      "package": "com.suyeon.maeumsee"
+    }
+  }
+}
