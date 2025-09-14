@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.next/
+.expo/
+.expo-shared/
+android/.gradle/
+android/app/build/
+ios/Pods/
+ios/build/
+.env
+.env.*
+.DS_Store
+*.log
+node_modules/
