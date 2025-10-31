@@ -1,0 +1,9 @@
+{
+  "java.import.gradle.enabled": false,
+  "java.import.gradle.wrapper.enabled": false,
+  "java.import.exclusions": ["**/android/**", "**/node_modules/**"],
+  "java.errors.incompleteClasspath.severity": "ignore",
+  "files.watcherExclude": {
+    "**/android/**": true
+  }
+}

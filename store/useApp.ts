@@ -1,111 +1,129 @@
-import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// store/useApp.ts
+import { create } from 'zustand'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-/** ===== 타입 정의 ===== */
-export type Emotion = '기쁨' | '슬픔' | '불안' | '분노' | '외로움' | '설렘' | '공허';
-export type Category =
-  | '일상'
-  | '고민'
-  | '연애'
-  | '회사'
-  | '유머'
-  | '성장'
-  | '자기돌봄'
-  | '관계';
+/* ========= 타입 ========= */
+export type Emotion = '기쁨' | '슬픔' | '불안' | '분노' | '외로움' | '설렘' | '공허'
+
+export type Category = '일상' | '고민' | '연애' | '회사' | '유머' | '성장' | '자기돌봄' | '관계'
 
 export interface RecordItem {
-  id: string;
-  date: string; // YYYY-MM-DD
-  emotion: Emotion;
-  content: string;
-  isPublic: boolean;
-  category?: Category;
-  imageUri?: string;
-  likes: number;
+  id: string
+  date: string // YYYY-MM-DD
+  emotion: Emotion
+  content: string
+  isPublic: boolean
+  category?: Category
+  imageUri?: string
+  likes: number
 }
 
 export interface Bloom {
-  id: string;
-  name: string;
-  tagEmotion: Emotion | string;
-  date: string;
-  likes: number;
-  emoji: string;
-  note?: string;
+  id: string
+  name: string
+  tagEmotion: Emotion | string
+  date: string
+  likes: number
+  emoji: string
+  note?: string
 }
 
-/** 알림 */
-export type NotiType = 'empathy' | 'bloom' | 'streak';
+export type NotiType = 'empathy' | 'bloom' | 'streak'
 export interface Notification {
-  id: string;
-  type: NotiType;
-  text: string;
-  createdAt: string; // ISO
-  read: boolean;
+  id: string
+  type: NotiType
+  text: string
+  createdAt: string // ISO
+  read: boolean
 }
 
-// 설정 타입
 export interface AppSettings {
   notifications: {
-    empathy: boolean;     // 공감 알림 ON/OFF
-    recordTime?: string;  // 기록 루틴 시간 (예: '21:30')
-  };
-  mbti?: string;
+    empathy: boolean
+    recordTime?: string
+  }
+  mbti?: string
   lock: {
-    enabled: boolean;
-    type?: 'biometric' | 'pin';
-    pin?: string; // 4자리
-  };
-    profileImageUri?: string; // 프로필 이미지
+    enabled: boolean
+    type?: 'biometric' | 'pin'
+    pin?: string
+  }
+  profileImageUri?: string
+  /** 씨앗명 월 1회 제한 체크용 ISO */
+  lastSeedEditAt?: string
 }
 
 export interface AppState {
-  seedName: string;
-  growthPct: number;
-  records: RecordItem[];
-  blooms: Bloom[];
-  settings: AppSettings;
+  seedName: string
+  growthPct: number
+  records: RecordItem[]
+  blooms: Bloom[]
+  settings: AppSettings
 
-  // 알림
-  notifications: Notification[];
+  notifications: Notification[]
 
-  // 공통
-  load: () => Promise<void>;
-  save: () => Promise<void>;
+  // 저장/로드
+  load: () => Promise<void>
+  save: () => Promise<void>
 
   // 기록
-  addOrUpdateRecord: (
-    r: Omit<RecordItem, 'id' | 'likes'> & { id?: string }
-  ) => Promise<void>;
+  addOrUpdateRecord: (r: Omit<RecordItem, 'id' | 'likes'> & { id?: string }) => Promise<void>
+  getRecordByDate: (date: string) => RecordItem | undefined
+  updateRecord: (r: RecordItem) => Promise<void>
+  deleteRecord: (id: string) => Promise<void>
 
   // 씨앗명
-  setSeedName: (name: string) => Promise<void>;
+  setSeedName: (name: string) => Promise<void>
+  /** 월 1회 제한 적용 */
+  setSeedNameWithLimit: (name: string) => Promise<'ok' | 'blocked' | 'invalid'>
 
   // 알림
-  addNotification: (
-    n: Omit<Notification, 'id' | 'createdAt' | 'read'>
-  ) => Promise<void>;
-  markAllRead: () => Promise<void>;
+  addNotification: (n: Omit<Notification, 'id' | 'createdAt' | 'read'>) => Promise<void>
+  markAllRead: () => Promise<void>
 
-  // 설정/프로필/내보내기/초기화
-  setSettings: (patch: Partial<AppSettings>) => Promise<void>;
-  setProfileImage: (uri?: string) => Promise<void>;
-  exportRecordsJSON: () => string;
-  exportRecordsCSV: () => string;
-  clearAll: () => Promise<void>;
+  // 설정/프로필
+  setSettings: (patch: Partial<AppSettings>) => Promise<void>
+  setProfileImage: (uri?: string) => Promise<void>
 
-  // 기록 관련 메서드
-  getRecordByDate: (date: string) => RecordItem | undefined;
-  updateRecord: (r: RecordItem) => Promise<void>;
-  deleteRecord: (id: string) => Promise<void>;
+  // 내보내기/초기화
+  exportRecordsJSON: () => string
+  exportRecordsCSV: () => string
+  clearAll: () => Promise<void>
+
+  // 파생 셀렉터
+  getGrowthPt: () => number
+  getStreakDays: () => number
 }
 
-const KEY = 'maeumsee_state_v1';
+/* ========= 유틸 ========= */
+const KEY = 'maeumsee_state_v1'
 
-/** ===== 초기 상태 & 구현 ===== */
+const isoToday = () => new Date().toISOString().slice(0, 10)
+
+function computeGrowthPt(records: Array<{ isPublic: boolean; likes?: number }>) {
+  let pt = 0
+  for (const r of records) {
+    pt += r.isPublic ? 10 : 5
+    pt += (r.likes ?? 0) * 2
+  }
+  return pt
+}
+
+function computeStreakDays(records: Array<{ date: string }>) {
+  const set = new Set(records.map((r) => r.date))
+  const d = new Date()
+  let streak = 0
+  while (set.has(d.toISOString().slice(0, 10))) {
+    streak++
+    d.setDate(d.getDate() - 1)
+  }
+  return streak
+}
+
+/* ========= 초기 상태 ========= */
 const initial: AppState = {
- seedName: '봄비',
-  growthPct: 10,
+  seedName: '봄비',
+  growthPct: 0,
   records: [],
   blooms: [],
   settings: {
@@ -113,46 +131,36 @@ const initial: AppState = {
     mbti: 'INFJ',
     lock: { enabled: false, type: 'pin', pin: undefined },
     profileImageUri: undefined,
-  }, 
-
-  // 특정 날짜 기록 조회
-  getRecordByDate(date) {
-    return this.records.find(r => r.date === date);
-  },
-
-  // 기록 전체 필드 업데이트(같은 id 유지)
-  async updateRecord(r) {
-    const idx = this.records.findIndex(x => x.id === r.id);
-    if (idx >= 0) this.records[idx] = r;
-    await this.save();
-  },
-
-  // 기록 삭제
-  async deleteRecord(id) {
-    this.records = this.records.filter(r => r.id !== id);
-    await this.save();
+    lastSeedEditAt: undefined,
   },
 
   notifications: [],
 
-  /** 로드 */
+  /* ---- 파생 셀렉터 ---- */
+  getGrowthPt() {
+    return computeGrowthPt(this.records)
+  },
+  getStreakDays() {
+    return computeStreakDays(this.records)
+  },
+
+  /* ---- 로드/세이브 ---- */
   async load() {
     try {
-      const raw = await AsyncStorage.getItem(KEY);
+      const raw = await AsyncStorage.getItem(KEY)
       if (raw) {
-        const parsed = JSON.parse(raw);
-        // 필드 안전 병합
-        this.seedName = parsed.seedName ?? this.seedName;
-        this.growthPct = parsed.growthPct ?? this.growthPct;
-        this.records = parsed.records ?? this.records;
-        this.blooms = parsed.blooms ?? this.blooms;
-        this.settings = { ...this.settings, ...(parsed.settings ?? {}) };
-        this.notifications = parsed.notifications ?? [];
+        const parsed = JSON.parse(raw)
+        this.seedName = parsed.seedName ?? this.seedName
+        this.records = parsed.records ?? this.records
+        this.blooms = parsed.blooms ?? this.blooms
+        this.settings = { ...this.settings, ...(parsed.settings ?? {}) }
+        this.notifications = parsed.notifications ?? []
       } else {
         // 데모 데이터
-        const d = new Date();
-        d.setDate(d.getDate() - 2);
-        const dd = d.toISOString().slice(0, 10);
+        const d = new Date()
+        d.setDate(d.getDate() - 2)
+        const dd = d.toISOString().slice(0, 10)
+
         this.records = [
           {
             id: 'seed-1',
@@ -163,7 +171,8 @@ const initial: AppState = {
             category: '성장',
             likes: 4,
           },
-        ];
+        ]
+
         this.blooms = [
           {
             id: 'b-1',
@@ -174,7 +183,8 @@ const initial: AppState = {
             emoji: '🌸',
             note: '첫 성취의 기쁨',
           },
-        ];
+        ]
+
         this.notifications = [
           {
             id: 'n-hello',
@@ -183,18 +193,20 @@ const initial: AppState = {
             createdAt: new Date().toISOString(),
             read: false,
           },
-        ];
+        ]
       }
+
+      // 계산값 동기화
+      this.growthPct = Math.min(100, computeGrowthPt(this.records))
     } catch (e) {
-      console.warn('load error', e);
+      console.warn('load error', e)
     }
   },
 
-  /** 저장 */
   async save() {
     try {
-      const { seedName, growthPct, records, blooms, settings, notifications } =
-        this;
+      this.growthPct = Math.min(100, computeGrowthPt(this.records))
+      const { seedName, growthPct, records, blooms, settings, notifications } = this
       await AsyncStorage.setItem(
         KEY,
         JSON.stringify({
@@ -205,38 +217,49 @@ const initial: AppState = {
           settings,
           notifications,
         })
-      );
+      )
     } catch (e) {
-      console.warn('save error', e);
+      console.warn('save error', e)
     }
   },
 
-  /** 기록 추가/수정 + 성장/개화 + (옵션) 알림 */
+  /* ---- 기록 ---- */
+  getRecordByDate(date) {
+    return this.records.find((r) => r.date === date)
+  },
+
+  async updateRecord(r) {
+    const idx = this.records.findIndex((x) => x.id === r.id)
+    if (idx >= 0) this.records[idx] = r
+    this.growthPct = Math.min(100, computeGrowthPt(this.records))
+    await this.save()
+  },
+
+  async deleteRecord(id) {
+    this.records = this.records.filter((r) => r.id !== id)
+    this.growthPct = Math.min(100, computeGrowthPt(this.records))
+    await this.save()
+  },
+
   async addOrUpdateRecord(r) {
-    const today = r.date;
-    const idx = this.records.findIndex((x) => x.date === today);
+    const idx = this.records.findIndex((x) => x.date === r.date)
 
     const record: RecordItem = {
       ...r,
       id: r.id || String(Date.now()),
-      likes: r.isPublic
-        ? idx >= 0
-          ? this.records[idx].likes
-          : Math.floor(Math.random() * 5)
-        : 0,
-    };
+      likes: r.isPublic ? (idx >= 0 ? this.records[idx].likes : Math.floor(Math.random() * 5)) : 0,
+    }
 
-    if (idx >= 0) this.records[idx] = record;
-    else this.records.push(record);
+    const beforePt = computeGrowthPt(this.records)
+    if (idx >= 0) this.records[idx] = record
+    else this.records.push(record)
+    const afterPt = computeGrowthPt(this.records)
+    this.growthPct = Math.min(100, afterPt)
 
-    // 성장 게이지
-    const before = this.growthPct;
-    this.growthPct = Math.min(100, this.growthPct + 10);
-
-    // 개화 임계치 통과 시 앨범 + 알림
-    const thresholds = [25, 50, 75, 100];
+    // 임계치 도달 시 개화 이벤트 (데모)
+    const thresholds = [25, 50, 75, 100]
     thresholds.forEach((t, i) => {
-      if (before < t && this.growthPct >= t) {
+      if (beforePt < t && afterPt >= t) {
         const bloom: Bloom = {
           id: record.id + '-b' + i,
           name: this.seedName,
@@ -245,21 +268,18 @@ const initial: AppState = {
           likes: record.likes,
           emoji: ['🌱', '🌿', '🌼', '🌸', '🌺'][i + 1] || '🌸',
           note: record.content.slice(0, 40),
-        };
-        this.blooms.push(bloom);
-
-        // 개화 알림
+        }
+        this.blooms.push(bloom)
         this.notifications.unshift({
           id: 'noti-' + bloom.id,
           type: 'bloom',
-          text: `개화 단계 도달! (${t}%)`,
+          text: `개화 단계 도달! (${t}pt)`,
           createdAt: new Date().toISOString(),
           read: false,
-        });
+        })
       }
-    });
+    })
 
-    // 공개 기록 시 가벼운 안내 알림(데모)
     if (record.isPublic) {
       this.notifications.unshift({
         id: 'noti-pub-' + record.id,
@@ -267,19 +287,40 @@ const initial: AppState = {
         text: '공개 기록이 등록됐어요. 공감을 기다려봅시다 💧',
         createdAt: new Date().toISOString(),
         read: false,
-      });
+      })
     }
 
-    await this.save();
+    await this.save()
   },
 
-  /** 씨앗명 수정 */
+  /* ---- 씨앗명 ---- */
   async setSeedName(name) {
-    this.seedName = name;
-    await this.save();
+    this.seedName = name
+    await this.save()
   },
 
-  /** 알림 추가(시뮬레이션/실시간 수신 공용) */
+  async setSeedNameWithLimit(name) {
+    const trimmed = (name ?? '').trim()
+    // 간단 유효성: 1~12자
+    if (!trimmed || trimmed.length > 12) return 'invalid'
+
+    const last = this.settings.lastSeedEditAt ? new Date(this.settings.lastSeedEditAt) : undefined
+    const now = new Date()
+
+    if (last) {
+      // "월 1회" → 마지막 변경일의 다음 달 같은 일(D+30 근사) 이전이면 차단
+      const next = new Date(last)
+      next.setMonth(next.getMonth() + 1)
+      if (now < next) return 'blocked'
+    }
+
+    this.seedName = trimmed
+    this.settings = { ...this.settings, lastSeedEditAt: now.toISOString() }
+    await this.save()
+    return 'ok'
+  },
+
+  /* ---- 알림 ---- */
   async addNotification(n) {
     const item: Notification = {
       id: String(Date.now()),
@@ -287,81 +328,75 @@ const initial: AppState = {
       text: n.text,
       createdAt: new Date().toISOString(),
       read: false,
-    };
-    this.notifications.unshift(item);
-    await this.save();
+    }
+    this.notifications.unshift(item)
+    await this.save()
   },
 
-  /** 모두 읽음 처리 */
   async markAllRead() {
-    this.notifications = this.notifications.map((x) => ({ ...x, read: true }));
-    await this.save();
+    this.notifications = this.notifications.map((x) => ({ ...x, read: true }))
+    await this.save()
   },
 
-  /** 설정 업데이트 */
+  /* ---- 설정/프로필 ---- */
   async setSettings(patch) {
-    this.settings = { ...this.settings, ...patch,
-      // 중첩 객체 notifications/lock도 안전 병합
-      notifications: { ...(this.settings.notifications || {}), ...(patch.notifications || {}) },
+    this.settings = {
+      ...this.settings,
+      ...patch,
+      notifications: {
+        ...(this.settings.notifications || {}),
+        ...(patch.notifications || {}),
+      },
       lock: { ...(this.settings.lock || {}), ...(patch.lock || {}) },
-    };
-    await this.save();
+    }
+    await this.save()
   },
 
-  /** 프로필 이미지 경로 저장 */
   async setProfileImage(uri) {
-    this.settings = { ...this.settings, profileImageUri: uri };
-    await this.save();
+    this.settings = { ...this.settings, profileImageUri: uri }
+    await this.save()
   },
 
-  /** 기록 내보내기(JSON) */
+  /* ---- 내보내기/초기화 ---- */
   exportRecordsJSON() {
-    return JSON.stringify(this.records, null, 2);
+    return JSON.stringify(this.records, null, 2)
   },
 
-  /** 기록 내보내기(CSV) */
   exportRecordsCSV() {
-    const header = ['id','date','emotion','content','isPublic','category','likes'];
-    const rows = this.records.map(r => [
+    const header = ['id', 'date', 'emotion', 'content', 'isPublic', 'category', 'likes']
+    const rows = this.records.map((r) => [
       r.id,
       r.date,
       r.emotion,
-      (r.content ?? '').replace(/\n/g,'\\n').replace(/"/g,'""'),
+      (r.content ?? '').replace(/\n/g, '\\n').replace(/"/g, '""'),
       r.isPublic ? 'true' : 'false',
       r.category ?? '',
       String(r.likes ?? 0),
-    ]);
-    const csv = [header, ...rows].map(cols =>
-      cols.map(v => /[",\n,]/.test(String(v)) ? `"${String(v)}"` : String(v)).join(',')
-    ).join('\n');
-    return csv;
+    ])
+    const csv = [header, ...rows]
+      .map((cols) =>
+        cols.map((v) => (/[",\n,]/.test(String(v)) ? `"${String(v)}"` : String(v))).join(',')
+      )
+      .join('\n')
+    return csv
   },
 
-  /** 전체 초기화(로그아웃/회원탈퇴용) */
   async clearAll() {
-    this.seedName = '봄비';
-    this.growthPct = 0;
-    this.records = [];
-    this.blooms = [];
-    this.notifications = [];
+    this.seedName = '봄비'
+    this.records = []
+    this.blooms = []
+    this.notifications = []
     this.settings = {
       notifications: { empathy: true, recordTime: '21:00' },
       mbti: 'INFJ',
       lock: { enabled: false, type: 'pin', pin: undefined },
       profileImageUri: undefined,
-    };
-    await AsyncStorage.removeItem(KEY);
-    await this.save();
+      lastSeedEditAt: undefined,
+    }
+    this.growthPct = 0
+    await AsyncStorage.removeItem(KEY)
+    await this.save()
   },
-};
-
-
-export const useApp = create<AppState>(() => initial);
-
-// 기존 AppState에 아래 3개를 추가
-export interface AppState {
-  // ...
-  getRecordByDate: (date: string) => RecordItem | undefined;
-  updateRecord: (r: RecordItem) => Promise<void>;
-  deleteRecord: (id: string) => Promise<void>;
 }
+
+export const useApp = create<AppState>(() => initial)
