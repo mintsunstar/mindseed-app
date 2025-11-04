@@ -1,37 +1,50 @@
 import React from 'react'
-import { Platform, View } from 'react-native'
+import { Platform, View, Image } from 'react-native'
 import type { StageDef } from './stageConfig'
 
-type Props = { stage: StageDef; size?: number; autoplay?: boolean; loop?: boolean }
+// 네이티브에서만 Lottie 사용 (웹은 PNG 폴백)
+let LottieView: any = null
+if (Platform.OS !== 'web') {
+  // 설치되어 있다면 정상 import, 없으면 try/catch로 안전하게
+  try {
+    LottieView = require('lottie-react-native').default
+  } catch (e) {
+    LottieView = null
+  }
+}
 
-export default function FlowerStageLottie({ stage, size = 220, autoplay = true, loop }: Props) {
-  const lp = typeof loop === 'boolean' ? loop : !!stage.loop
+type Props = {
+  stage: StageDef | { label: string } // 안전타입
+  size?: number
+}
 
-  if (Platform.OS === 'web') {
-    // 웹: lottie-react
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const Lottie = require('lottie-react').default
-    return (
-      <View style={{ width: size, height: size, alignSelf: 'center' }}>
-        <Lottie
-          animationData={stage.lottie}
-          autoplay={autoplay}
-          loop={lp}
-          style={{ width: size, height: size }}
+export default function FlowerStageLottie({ stage, size = 220 }: Props) {
+  // 웹: PNG 폴백 (또는 네이티브 Lottie 미설치 시에도 PNG 사용)
+  if (Platform.OS === 'web' || !LottieView) {
+    // stage가 StageDef가 아닐 경우를 대비해 png 존재 여부 체크
+    const pngSrc = (stage as any).png
+    if (pngSrc) {
+      return (
+        <Image
+          source={pngSrc}
+          style={{ width: size, height: size, objectFit: 'contain' as any }}
+          resizeMode="contain"
         />
-      </View>
-    )
+      )
+    }
+    // PNG도 없으면 빈 영역
+    return <View style={{ width: size, height: size }} />
   }
 
-  // 네이티브: lottie-react-native
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const LottieView = require('lottie-react-native')
+  // 네이티브: Lottie 애니메이션
   return (
-    <LottieView
-      source={stage.lottie}
-      autoPlay={autoplay}
-      loop={lp}
-      style={{ width: size, height: size, alignSelf: 'center' }}
-    />
+    <View style={{ width: size, height: size }}>
+      <LottieView
+        source={(stage as any).lottie}
+        autoPlay
+        loop={(stage as any).loop ?? true}
+        style={{ width: size, height: size }}
+      />
+    </View>
   )
 }
