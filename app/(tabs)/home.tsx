@@ -1,5 +1,3 @@
-// app/(tabs)/home.tsx
-
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   ScrollView,
@@ -58,6 +56,16 @@ function weekStartOf(date = new Date()) {
 function toast(msg: string) {
   if (Platform.OS === 'android') ToastAndroid.show(msg, ToastAndroid.SHORT)
   else Alert.alert('', msg)
+}
+
+/** % → 단계 텍스트 */
+function stageLabelByPct(p: number) {
+  if (p >= 100) return '개화'
+  if (p >= 70) return '반쯤핀꽃'
+  if (p >= 50) return '꽃봉오리'
+  if (p >= 30) return '줄기'
+  if (p >= 10) return '새싹'
+  return '씨앗'
 }
 
 export default function Home() {
@@ -122,20 +130,19 @@ export default function Home() {
 
       {/* 나의 정원 */}
       <Card>
-        <Section
-          title="나의 정원"
-          subtitle="기록 +pt · 공감 자동 반영"
-          right={
-            <Pressable onPress={() => setShowMonth(true)} hitSlop={8}>
-              <Text style={{ fontSize: 18 }}>📅</Text>
-            </Pressable>
-          }
-        >
+        {/* ⛔️ 달력 아이콘은 여기서 제거하여 레이아웃 틀어짐 방지 */}
+        <Section title="나의 정원" subtitle="기록 +pt · 공감 자동 반영">
           <View style={s.gardenBox}>
             {/* 게이지 + Lottie (오류 시 게이지만) */}
             <ErrorBoundary fallback={<FlowerGauge pt={growthPt} hideLabels />}>
               <FlowerGrowth pt={growthPt} hideLabels />
             </ErrorBoundary>
+
+            {/* 단계/퍼센트 텍스트 표기 */}
+            <View style={s.stageBox}>
+              <Text style={s.stageName}>{stageLabelByPct(growthPt)} 단계</Text>
+              <Text style={s.stagePct}>{Math.round(growthPt)}%</Text>
+            </View>
 
             {/* 씨앗명 편집 */}
             {!editing ? (
@@ -195,9 +202,21 @@ export default function Home() {
         </Section>
       </Card>
 
-      {/* 주간 감정 달력 */}
+      {/* 주간 감정 달력 — 📅 아이콘을 여기 오른쪽에 배치 */}
       <Card>
-        <Section title="주간 감정 달력" subtitle="스티커를 눌러 기록 보기">
+        <Section
+          title="주간 감정 달력"
+          subtitle="스티커를 눌러 기록 보기"
+          right={
+            <Pressable
+              onPress={() => setShowMonth(true)}
+              hitSlop={8}
+              accessibilityLabel="월간 달력"
+            >
+              <Text style={{ fontSize: 18 }}>📅</Text>
+            </Pressable>
+          }
+        >
           <WeekCalendar
             records={app.records}
             currentStart={weekStart}
@@ -207,7 +226,7 @@ export default function Home() {
             onPick={(date) => {
               // 미래 날짜 방지
               if (date > today) {
-                toast('미래 날짜는 기록할 수 없어요')
+                toast('미래 날짜는 기록할 수 없어요!')
                 return
               }
               const r = app.getRecordByDate?.(date) ?? app.records.find((x) => x.date === date)
@@ -257,7 +276,7 @@ export default function Home() {
               today={today}
               onPick={(date) => {
                 if (date > today) {
-                  toast('미래 날짜는 기록할 수 없어요')
+                  toast('미래 날짜는 기록할 수 없어요!')
                   return
                 }
                 const r = app.getRecordByDate?.(date) ?? app.records.find((x) => x.date === date)
@@ -280,7 +299,7 @@ export default function Home() {
 /* ───────────────────────── styles ───────────────────────── */
 const s = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: '#fffdfb' },
-  container: { gap: 12, padding: 12, paddingBottom: 28 },
+  container: { gap: 12, padding: 12, paddingBottom: 96 },
 
   topbar: {
     flexDirection: 'row',
@@ -291,6 +310,10 @@ const s = StyleSheet.create({
   topTitle: { fontWeight: '900', fontSize: 18 },
 
   gardenBox: { alignItems: 'center', gap: 10 },
+
+  stageBox: { alignItems: 'center', marginTop: 6, gap: 2 },
+  stageName: { fontWeight: '800', fontSize: 15 },
+  stagePct: { color: '#666' },
 
   seedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   seedEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

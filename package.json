@@ -21,7 +21,7 @@
     "expo-notifications": "~0.28.15",
     "expo-router": "~3.5.8",
     "lottie-react": "^2.4.1",
-    "lottie-react-native": "^6.7.0",
+    "lottie-react-native": "^6.7.2",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-hook-form": "^7.51.5",

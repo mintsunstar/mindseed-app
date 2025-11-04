@@ -59,46 +59,45 @@ export interface AppState {
   records: RecordItem[]
   blooms: Bloom[]
   settings: AppSettings
-
   notifications: Notification[]
 
-  // 저장/로드
   load: () => Promise<void>
   save: () => Promise<void>
 
-  // 기록
   addOrUpdateRecord: (r: Omit<RecordItem, 'id' | 'likes'> & { id?: string }) => Promise<void>
   getRecordByDate: (date: string) => RecordItem | undefined
   updateRecord: (r: RecordItem) => Promise<void>
   deleteRecord: (id: string) => Promise<void>
 
-  // 씨앗명
   setSeedName: (name: string) => Promise<void>
-  /** 월 1회 제한 적용 */
   setSeedNameWithLimit: (name: string) => Promise<'ok' | 'blocked' | 'invalid'>
 
-  // 알림
   addNotification: (n: Omit<Notification, 'id' | 'createdAt' | 'read'>) => Promise<void>
   markAllRead: () => Promise<void>
 
-  // 설정/프로필
   setSettings: (patch: Partial<AppSettings>) => Promise<void>
   setProfileImage: (uri?: string) => Promise<void>
 
-  // 내보내기/초기화
   exportRecordsJSON: () => string
   exportRecordsCSV: () => string
   clearAll: () => Promise<void>
 
-  // 파생 셀렉터
   getGrowthPt: () => number
   getStreakDays: () => number
+
+  /** 같은 id 알림이 이미 있으면 추가하지 않는다 */
+  pushNotiOnce: (id: string, payload: Omit<Notification, 'id' | 'createdAt' | 'read'>) => void
 }
 
 /* ========= 유틸 ========= */
+
+// useApp.ts 상단 근처
+const makeId = (prefix = 'noti') =>
+  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
 const KEY = 'maeumsee_state_v1'
 
-const isoToday = () => new Date().toISOString().slice(0, 10)
+const ymLocal = (d: Date) => `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`
 
 function computeGrowthPt(records: Array<{ isPublic: boolean; likes?: number }>) {
   let pt = 0
@@ -133,10 +132,9 @@ const initial: AppState = {
     profileImageUri: undefined,
     lastSeedEditAt: undefined,
   },
-
   notifications: [],
 
-  /* ---- 파생 셀렉터 ---- */
+  /* 파생 셀렉터 */
   getGrowthPt() {
     return computeGrowthPt(this.records)
   },
@@ -144,7 +142,7 @@ const initial: AppState = {
     return computeStreakDays(this.records)
   },
 
-  /* ---- 로드/세이브 ---- */
+  /* 로드/세이브 */
   async load() {
     try {
       const raw = await AsyncStorage.getItem(KEY)
@@ -156,11 +154,9 @@ const initial: AppState = {
         this.settings = { ...this.settings, ...(parsed.settings ?? {}) }
         this.notifications = parsed.notifications ?? []
       } else {
-        // 데모 데이터
         const d = new Date()
         d.setDate(d.getDate() - 2)
         const dd = d.toISOString().slice(0, 10)
-
         this.records = [
           {
             id: 'seed-1',
@@ -172,7 +168,6 @@ const initial: AppState = {
             likes: 4,
           },
         ]
-
         this.blooms = [
           {
             id: 'b-1',
@@ -184,7 +179,6 @@ const initial: AppState = {
             note: '첫 성취의 기쁨',
           },
         ]
-
         this.notifications = [
           {
             id: 'n-hello',
@@ -195,8 +189,6 @@ const initial: AppState = {
           },
         ]
       }
-
-      // 계산값 동기화
       this.growthPct = Math.min(100, computeGrowthPt(this.records))
     } catch (e) {
       console.warn('load error', e)
@@ -209,21 +201,14 @@ const initial: AppState = {
       const { seedName, growthPct, records, blooms, settings, notifications } = this
       await AsyncStorage.setItem(
         KEY,
-        JSON.stringify({
-          seedName,
-          growthPct,
-          records,
-          blooms,
-          settings,
-          notifications,
-        })
+        JSON.stringify({ seedName, growthPct, records, blooms, settings, notifications })
       )
     } catch (e) {
       console.warn('save error', e)
     }
   },
 
-  /* ---- 기록 ---- */
+  /* 기록 관련 */
   getRecordByDate(date) {
     return this.records.find((r) => r.date === date)
   },
@@ -243,20 +228,17 @@ const initial: AppState = {
 
   async addOrUpdateRecord(r) {
     const idx = this.records.findIndex((x) => x.date === r.date)
-
     const record: RecordItem = {
       ...r,
       id: r.id || String(Date.now()),
       likes: r.isPublic ? (idx >= 0 ? this.records[idx].likes : Math.floor(Math.random() * 5)) : 0,
     }
-
     const beforePt = computeGrowthPt(this.records)
     if (idx >= 0) this.records[idx] = record
     else this.records.push(record)
     const afterPt = computeGrowthPt(this.records)
     this.growthPct = Math.min(100, afterPt)
 
-    // 임계치 도달 시 개화 이벤트 (데모)
     const thresholds = [25, 50, 75, 100]
     thresholds.forEach((t, i) => {
       if (beforePt < t && afterPt >= t) {
@@ -289,41 +271,36 @@ const initial: AppState = {
         read: false,
       })
     }
-
     await this.save()
   },
 
-  /* ---- 씨앗명 ---- */
+  /* 씨앗명 월 1회 제한 */
   async setSeedName(name) {
     this.seedName = name
     await this.save()
   },
 
   async setSeedNameWithLimit(name) {
-    const trimmed = (name ?? '').trim()
-    // 간단 유효성: 1~12자
-    if (!trimmed || trimmed.length > 12) return 'invalid'
+    const next = (name ?? '').trim()
+    if (!next || next.length > 12) return 'invalid'
 
-    const last = this.settings.lastSeedEditAt ? new Date(this.settings.lastSeedEditAt) : undefined
+    const prevISO = this.settings.lastSeedEditAt
     const now = new Date()
+    const nowYM = ymLocal(now)
+    const prevYM = prevISO ? ymLocal(new Date(prevISO)) : null
 
-    if (last) {
-      // "월 1회" → 마지막 변경일의 다음 달 같은 일(D+30 근사) 이전이면 차단
-      const next = new Date(last)
-      next.setMonth(next.getMonth() + 1)
-      if (now < next) return 'blocked'
-    }
+    if (prevYM && prevYM === nowYM) return 'blocked'
 
-    this.seedName = trimmed
+    this.seedName = next
     this.settings = { ...this.settings, lastSeedEditAt: now.toISOString() }
     await this.save()
     return 'ok'
   },
 
-  /* ---- 알림 ---- */
+  /* 알림 */
   async addNotification(n) {
     const item: Notification = {
-      id: String(Date.now()),
+      id: makeId('noti'), // ← 무조건 유니크
       type: n.type,
       text: n.text,
       createdAt: new Date().toISOString(),
@@ -338,7 +315,19 @@ const initial: AppState = {
     await this.save()
   },
 
-  /* ---- 설정/프로필 ---- */
+  /** 같은 id 알림이 이미 있으면 추가하지 않는다 */
+  pushNotiOnce(id: string, payload: Omit<Notification, 'id' | 'createdAt' | 'read'>) {
+    if (!this.notifications.some((n) => n.id === id)) {
+      this.notifications.unshift({
+        id,
+        ...payload,
+        createdAt: new Date().toISOString(),
+        read: false,
+      })
+    }
+  },
+
+  /* 설정/프로필 */
   async setSettings(patch) {
     this.settings = {
       ...this.settings,
@@ -357,7 +346,7 @@ const initial: AppState = {
     await this.save()
   },
 
-  /* ---- 내보내기/초기화 ---- */
+  /* 내보내기/초기화 */
   exportRecordsJSON() {
     return JSON.stringify(this.records, null, 2)
   },

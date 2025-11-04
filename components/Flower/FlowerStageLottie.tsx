@@ -1,62 +1,36 @@
-import React, { useEffect, useState } from 'react'
-import { Platform } from 'react-native'
+import React from 'react'
+import { Platform, View } from 'react-native'
 import type { StageDef } from './stageConfig'
 
-type Props = {
-  stage: StageDef
-  size?: number
-  autoplay?: boolean
-}
+type Props = { stage: StageDef; size?: number; autoplay?: boolean; loop?: boolean }
 
-/**
- * 웹 ↔ 네이티브 Lottie 프롭 차이를 안전하게 흡수
- * - web:  lottie-react     → animationData
- * - native: lottie-react-native → source
- */
-export default function FlowerStageLottie({ stage, size = 220, autoplay = true }: Props) {
-  const [Lottie, setLottie] = useState<any>(null)
-
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      try {
-        if (Platform.OS === 'web') {
-          const mod = await import('lottie-react')
-          if (alive) setLottie(() => mod.default)
-        } else {
-          const mod = await import('lottie-react-native')
-          if (alive) setLottie(() => mod.default)
-        }
-      } catch (e) {
-        console.warn('[Lottie import error]', e)
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  if (!Lottie) return null
-
-  const loop = stage.loop ?? true
+export default function FlowerStageLottie({ stage, size = 220, autoplay = true, loop }: Props) {
+  const lp = typeof loop === 'boolean' ? loop : !!stage.loop
 
   if (Platform.OS === 'web') {
-    // lottie-react
+    // 웹: lottie-react
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Lottie = require('lottie-react').default
     return (
-      <Lottie
-        animationData={stage.lottie}
-        loop={loop}
-        autoPlay={autoplay}
-        style={{ width: size, height: size, alignSelf: 'center' }}
-      />
+      <View style={{ width: size, height: size, alignSelf: 'center' }}>
+        <Lottie
+          animationData={stage.lottie}
+          autoplay={autoplay}
+          loop={lp}
+          style={{ width: size, height: size }}
+        />
+      </View>
     )
   }
-  // lottie-react-native
+
+  // 네이티브: lottie-react-native
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const LottieView = require('lottie-react-native')
   return (
-    <Lottie
+    <LottieView
       source={stage.lottie}
-      loop={loop}
       autoPlay={autoplay}
+      loop={lp}
       style={{ width: size, height: size, alignSelf: 'center' }}
     />
   )
