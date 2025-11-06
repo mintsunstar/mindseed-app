@@ -83,6 +83,7 @@ export default function Home() {
       d.setDate(d.getDate() - 7)
       return d
     })
+
   const nextWeek = () =>
     setWeekStart((prev) => {
       const d = new Date(prev)
