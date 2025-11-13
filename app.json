@@ -5,12 +5,8 @@
     "scheme": "maeumsee",
     "version": "0.1.0",
     "orientation": "portrait",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "plugins": [
-      "expo-router"
-    ],
+    "assetBundlePatterns": ["assets/**"],
+    "plugins": ["expo-router"],
     "android": {
       "package": "com.suyeon.maeumsee"
     }
