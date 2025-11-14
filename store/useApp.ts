@@ -51,6 +51,10 @@ export interface AppSettings {
   profileImageUri?: string
   /** 씨앗명 월 1회 제한 체크용 ISO */
   lastSeedEditAt?: string
+
+  /** ⭐ 프로필용 필드들 추가 */
+  nickname?: string
+  intro?: string
 }
 
 export interface AppState {
@@ -131,6 +135,10 @@ const initial: AppState = {
     lock: { enabled: false, type: 'pin', pin: undefined },
     profileImageUri: undefined,
     lastSeedEditAt: undefined,
+
+    /** ⭐ 프로필 기본값 */
+    nickname: '',
+    intro: '',
   },
   notifications: [],
 
@@ -300,7 +308,7 @@ const initial: AppState = {
   /* 알림 */
   async addNotification(n) {
     const item: Notification = {
-      id: makeId('noti'), // ← 무조건 유니크
+      id: makeId('noti'),
       type: n.type,
       text: n.text,
       createdAt: new Date().toISOString(),
@@ -381,6 +389,10 @@ const initial: AppState = {
       lock: { enabled: false, type: 'pin', pin: undefined },
       profileImageUri: undefined,
       lastSeedEditAt: undefined,
+
+      /** ⭐ 여기서도 초기화 */
+      nickname: '',
+      intro: '',
     }
     this.growthPct = 0
     await AsyncStorage.removeItem(KEY)

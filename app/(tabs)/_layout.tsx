@@ -40,7 +40,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="my"
         options={{
-          title: '내 정보',
+          title: '내 정원',
           tabBarIcon: () => <EmojiIcon emoji="🌸" />,
         }}
       />

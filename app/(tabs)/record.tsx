@@ -107,8 +107,13 @@ export default function RecordScreen() {
   async function pingHaptic() {
     try {
       if (Platform.OS !== 'web') {
-        const ok = (Haptics as any).isAvailableAsync ? await Haptics.isAvailableAsync() : true
-        if (ok) await Haptics.selectionAsync()
+        const h: any = Haptics
+        const hasCheck = typeof h.isAvailableAsync === 'function'
+        const ok = hasCheck ? await h.isAvailableAsync() : true
+
+        if (ok && typeof h.selectionAsync === 'function') {
+          await h.selectionAsync()
+        }
       }
     } catch {}
   }
