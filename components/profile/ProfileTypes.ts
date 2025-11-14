@@ -12,3 +12,12 @@ export type ProfileData = {
   intro?: string
   stats: ProfileStats
 }
+// components/profile/ProfileTypes.ts
+export type MenuItem = {
+  id?: string // ✅ 추가 (key로 쓰기 좋게)
+  label: string
+  icon: string
+  description?: string
+  danger?: boolean
+  onPress: () => void
+}

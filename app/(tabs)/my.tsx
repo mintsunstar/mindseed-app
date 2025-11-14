@@ -47,7 +47,7 @@ export default function MyScreen() {
   const [profile, setProfile] = useState<ProfileData>({
     nickname: app.settings.nickname ?? '수연',
     mbti: app.settings.mbti ?? 'INFJ',
-    seedName: app.settings.seedName ?? '봄비',
+    seedName: app.seedName ?? '봄비',
     intro: app.settings.intro ?? '오늘도 마음씨 정원을 잘 가꾸고 있어요.',
     stats: {
       totalRecords: app.records.length,

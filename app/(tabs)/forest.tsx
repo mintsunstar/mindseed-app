@@ -144,7 +144,7 @@ export default function ForestScreen() {
   }
 
   const handleShare = (post: ForestPost) => {
-    const text = `마음숲 ${post.cat} ${post.emo}\n\n${post.text}\n\n#마음씨 #마음숲`
+    const text = `공감숲 ${post.cat} ${post.emo}\n\n${post.text}\n\n#마음씨 #공감숲`
     // 나중에 React Native 공유 API 연동 가능
     console.log('copy/share text:', text)
     showToast('🔗 글이 복사되었어요. 원하는 곳에 붙여넣기 해보세요')
@@ -210,7 +210,7 @@ export default function ForestScreen() {
             style={[styles.btn, styles.reportBtn]}
             onPress={() => openReport(item.id)}
           >
-            <Text style={styles.reportText}>신고</Text>
+            <Text style={styles.reportText}>🚨신고</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -224,7 +224,7 @@ export default function ForestScreen() {
         <View style={styles.headLeft}>
           <Text style={styles.seedEmoji}>🌿</Text>
           <View>
-            <Text style={styles.title}>마음숲</Text>
+            <Text style={styles.title}>공감숲</Text>
             <Text style={styles.subtitle}>공감으로 서로를 가볍게</Text>
           </View>
         </View>
